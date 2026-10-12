@@ -1,0 +1,122 @@
+package androidx.core.provider;
+
+import android.os.Handler;
+import android.os.Process;
+import androidx.core.util.Consumer;
+import androidx.core.util.Preconditions;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+/* JADX INFO: loaded from: classes4.dex */
+class RequestExecutor {
+
+    private static class DefaultThreadFactory implements ThreadFactory {
+        private int mPriority;
+        private String mThreadName;
+
+        private static class ProcessPriorityThread extends Thread {
+            private final int mPriority;
+
+            ProcessPriorityThread(Runnable target, String name, int priority) {
+                super(target, name);
+                this.mPriority = priority;
+            }
+
+            @Override // java.lang.Thread, java.lang.Runnable
+            public void run() {
+                Process.setThreadPriority(this.mPriority);
+                super.run();
+            }
+        }
+
+        DefaultThreadFactory(String threadName, int priority) {
+            this.mThreadName = threadName;
+            this.mPriority = priority;
+        }
+
+        @Override // java.util.concurrent.ThreadFactory
+        public Thread newThread(Runnable runnable) {
+            return new ProcessPriorityThread(runnable, this.mThreadName, this.mPriority);
+        }
+    }
+
+    private static class HandlerExecutor implements Executor {
+        private final Handler mHandler;
+
+        HandlerExecutor(Handler handler) {
+            this.mHandler = (Handler) Preconditions.checkNotNull(handler);
+        }
+
+        @Override // java.util.concurrent.Executor
+        public void execute(Runnable command) {
+            if (this.mHandler.post((Runnable) Preconditions.checkNotNull(command)) == false) goto L6;
+            return;
+        L6:
+            throw new RejectedExecutionException(this.mHandler + " is shutting down");
+        }
+    }
+
+    private static class ReplyRunnable<T> implements Runnable {
+        private Callable<T> mCallable;
+        private Consumer<T> mConsumer;
+        private Handler mHandler;
+
+        ReplyRunnable(Handler handler, Callable<T> callable, Consumer<T> consumer) {
+            this.mCallable = callable;
+            this.mConsumer = consumer;
+            this.mHandler = handler;
+        }
+
+        @Override // java.lang.Runnable
+        public void run() {
+            T t = this.mCallable.call();     // Catch: Exception -> L4
+        L6:
+            final T result = t;
+            final Consumer<T> consumer = this.mConsumer;
+            this.mHandler.post(new AnonymousClass1(this, consumer, result));
+            return;
+        L5:
+            t = null;
+            goto L6
+        }
+    }
+
+    private RequestExecutor() {
+    }
+
+    static <T> void execute(Executor executor, Callable<T> callable, Consumer<T> consumer) {
+        Handler calleeHandler = CalleeHandler.create();
+        executor.execute(new ReplyRunnable(calleeHandler, callable, consumer));
+    }
+
+    static <T> T submit(ExecutorService executor, Callable<T> callable, int timeoutMillis) throws InterruptedException {
+        Future<T> future = executor.submit(callable);
+        return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+    L8:
+        e = move-exception;
+        throw e;
+    L10:
+        e = move-exception;
+        throw new RuntimeException(e);
+    L7:
+        throw new InterruptedException("timeout");
+    }
+
+    static ThreadPoolExecutor createDefaultExecutor(String threadName, int threadPriority, int keepAliveTimeInMillis) {
+        ThreadFactory threadFactory = new DefaultThreadFactory(threadName, threadPriority);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(0, 1, keepAliveTimeInMillis, TimeUnit.MILLISECONDS, new LinkedBlockingDeque(), threadFactory);
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
+    }
+
+    static Executor createHandlerExecutor(Handler handler) {
+        return new HandlerExecutor(handler);
+    }
+}

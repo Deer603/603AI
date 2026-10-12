@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset android:insetLeft="18.0dp" android:insetRight="18.0dp" android:insetTop="18.0dp" android:insetBottom="18.0dp"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <bitmap android:gravity="fill" android:src="@drawable/lulu_icon_foreground" android:filter="true" />
+</inset>

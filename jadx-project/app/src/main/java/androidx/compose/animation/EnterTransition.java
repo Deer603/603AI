@@ -1,0 +1,127 @@
+package androidx.compose.animation;
+
+import java.util.Map;
+import kotlin.Metadata;
+import kotlin.collections.MapsKt;
+import kotlin.jvm.internal.DefaultConstructorMarker;
+import kotlin.jvm.internal.Intrinsics;
+
+/* JADX INFO: compiled from: EnterExitTransition.kt */
+/* JADX INFO: loaded from: classes.dex */
+@Metadata(d1 = {"\u00000\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u000b\n\u0002\b\u0002\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u000e\n\u0000\n\u0002\u0018\u0002\n\u0000\b7\u0018\u0000 \u00102\u00020\u0001:\u0001\u0010B\u0007\b\u0004¢\u0006\u0002\u0010\u0002J\u0013\u0010\u0007\u001a\u00020\b2\b\u0010\t\u001a\u0004\u0018\u00010\u0001H\u0096\u0002J\b\u0010\n\u001a\u00020\u000bH\u0016J\u0011\u0010\f\u001a\u00020\u00002\u0006\u0010\r\u001a\u00020\u0000H\u0087\u0002J\b\u0010\u000e\u001a\u00020\u000fH\u0016R\u0012\u0010\u0003\u001a\u00020\u0004X \u0004¢\u0006\u0006\u001a\u0004\b\u0005\u0010\u0006\u0082\u0001\u0001\u0011¨\u0006\u0012"}, d2 = {"Landroidx/compose/animation/EnterTransition;", "", "()V", "data", "Landroidx/compose/animation/TransitionData;", "getData$animation_release", "()Landroidx/compose/animation/TransitionData;", "equals", "", "other", "hashCode", "", "plus", "enter", "toString", "", "Companion", "Landroidx/compose/animation/EnterTransitionImpl;", "animation_release"}, k = 1, mv = {1, 9, 0}, xi = 48)
+public abstract class EnterTransition {
+    public static final int $stable = 0;
+    public static final Companion Companion = null;
+    private static final EnterTransition None = null;
+
+    /* JADX INFO: compiled from: EnterExitTransition.kt */
+    @Metadata(d1 = {"\u0000\u0014\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\b\u0086\u0003\u0018\u00002\u00020\u0001B\u0007\b\u0002¢\u0006\u0002\u0010\u0002R\u0011\u0010\u0003\u001a\u00020\u0004¢\u0006\b\n\u0000\u001a\u0004\b\u0005\u0010\u0006¨\u0006\u0007"}, d2 = {"Landroidx/compose/animation/EnterTransition$Companion;", "", "()V", "None", "Landroidx/compose/animation/EnterTransition;", "getNone", "()Landroidx/compose/animation/EnterTransition;", "animation_release"}, k = 1, mv = {1, 9, 0}, xi = 48)
+    public static final class Companion {
+        public /* synthetic */ Companion(DefaultConstructorMarker r1) {
+            this();
+        }
+
+        private Companion() {
+        }
+
+        public final EnterTransition getNone() {
+            return EnterTransition.access$getNone$cp();
+        }
+    }
+
+    public /* synthetic */ EnterTransition(DefaultConstructorMarker r1) {
+        this();
+    }
+
+    public abstract TransitionData getData$animation_release();
+
+    private EnterTransition() {
+    }
+
+    public static final /* synthetic */ EnterTransition access$getNone$cp() {
+        return None;
+    }
+
+    public final EnterTransition plus(EnterTransition enter) {
+        Fade r2 = enter.getData$animation_release().getFade();
+        if (r2 != null) goto L5;
+        r2 = getData$animation_release().getFade();
+    L5:
+        Slide r3 = enter.getData$animation_release().getSlide();
+        if (r3 != null) goto L8;
+        r3 = getData$animation_release().getSlide();
+    L8:
+        ChangeSize r4 = enter.getData$animation_release().getChangeSize();
+        if (r4 != null) goto L11;
+        r4 = getData$animation_release().getChangeSize();
+    L11:
+        Scale r5 = enter.getData$animation_release().getScale();
+        if (r5 != null) goto L14;
+        r5 = getData$animation_release().getScale();
+    L14:
+        boolean r6 = false;
+        return new EnterTransitionImpl(new TransitionData(r2, r3, r4, r5, r6, MapsKt.plus(getData$animation_release().getEffectsMap(), enter.getData$animation_release().getEffectsMap()), 16, null));
+    }
+
+    public String toString() {
+        if (Intrinsics.areEqual(this, None) == false) goto L5;
+        return "EnterTransition.None";
+    L5:
+        TransitionData $this$toString_u24lambda_u240 = getData$animation_release();
+        StringBuilder r2 = new StringBuilder().append("EnterTransition: \nFade - ");
+        Fade r3 = $this$toString_u24lambda_u240.getFade();
+        String r4 = null;
+        if (r3 == null) goto L8;
+        String r5 = r3.toString();
+    L9:
+        StringBuilder r6 = r2.append(r5).append(",\nSlide - ");
+        Slide r7 = $this$toString_u24lambda_u240.getSlide();
+        if (r7 == null) goto L12;
+        String r8 = r7.toString();
+    L13:
+        StringBuilder r9 = r6.append(r8).append(",\nShrink - ");
+        ChangeSize r10 = $this$toString_u24lambda_u240.getChangeSize();
+        if (r10 == null) goto L16;
+        String r11 = r10.toString();
+    L17:
+        StringBuilder r12 = r9.append(r11).append(",\nScale - ");
+        Scale r13 = $this$toString_u24lambda_u240.getScale();
+        if (r13 == null) goto L21;
+        r4 = r13.toString();
+    L21:
+        return r12.append(r4).toString();
+    L16:
+        r11 = null;
+        goto L17
+    L12:
+        r8 = null;
+        goto L13
+    L8:
+        r5 = null;
+        goto L9
+    }
+
+    public boolean equals(Object other) {
+        if ((other instanceof EnterTransition) == true) goto L5;
+    L7:
+        return false;
+    L5:
+        if (Intrinsics.areEqual(((EnterTransition) other).getData$animation_release(), getData$animation_release()) == false) goto L7;
+        return true;
+    }
+
+    public int hashCode() {
+        return getData$animation_release().hashCode();
+    }
+
+    static {
+        Companion = new Companion(null);
+        Fade r2 = null;
+        Slide r3 = null;
+        ChangeSize r4 = null;
+        Scale r5 = null;
+        boolean r6 = false;
+        Map r7 = null;
+        None = new EnterTransitionImpl(new TransitionData(r2, r3, r4, r5, r6, r7, 63, null));
+    }
+}

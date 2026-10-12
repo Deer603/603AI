@@ -1,0 +1,55 @@
+# 系统与编辑器文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Android与Gradle本机构建配置
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+local.properties
+build/
+dist/
+out/
+captures/
+
+# 构建产物；保留重打包所需的原生.so库和源码资源
+*.apk
+*.aab
+*.apks
+*.dex
+*.class
+/603AI*.zip
+
+# 重打包必须包含原生依赖，覆盖本机可能存在的全局忽略规则
+!/apktool-project/lib/**/*.so
+!/jadx-project/app/src/main/lib/**/*.so
+
+# 签名文件与本机凭据
+*.jks
+*.keystore
+*.p12
+*.pfx
+key.properties
+keystore.properties
+signing.properties
+.env
+.env.*
+!.env.example
+
+# 导入前的APK、分析记录、日志和交付资料
+/original/
+/analysis/
+/logs/
+/build-support/
+/恢复说明.txt
+/逆向说明.txt
+/apktool-project/original/
+*.log

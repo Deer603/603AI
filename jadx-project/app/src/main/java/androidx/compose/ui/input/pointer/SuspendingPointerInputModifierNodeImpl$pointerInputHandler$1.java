@@ -1,0 +1,51 @@
+package androidx.compose.ui.input.pointer;
+
+import kotlin.Metadata;
+import kotlin.ResultKt;
+import kotlin.Unit;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
+import kotlin.coroutines.jvm.internal.DebugMetadata;
+import kotlin.coroutines.jvm.internal.SuspendLambda;
+import kotlin.jvm.functions.Function2;
+
+/* JADX INFO: compiled from: SuspendingPointerInputFilter.kt */
+/* JADX INFO: loaded from: classes.dex */
+@Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\u008a@"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/PointerInputScope;"}, k = 3, mv = {1, 9, 0}, xi = 48)
+@DebugMetadata(c = "androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1", f = "SuspendingPointerInputFilter.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, s = {})
+final class SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1 extends SuspendLambda implements Function2<PointerInputScope, Continuation<? super Unit>, Object> {
+    int label;
+
+    SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1(Continuation<? super SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1> r2) {
+        super(2, r2);
+    }
+
+    @Override // kotlin.coroutines.jvm.internal.BaseContinuationImpl
+    public final Continuation<Unit> create(Object r2, Continuation<?> r3) {
+        return new SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1(r3);
+    }
+
+    /* JADX INFO: renamed from: invoke, reason: avoid collision after fix types in other method */
+    public final Object invoke2(PointerInputScope r3, Continuation<? super Unit> r4) {
+        return ((SuspendingPointerInputModifierNodeImpl$pointerInputHandler$1) create(r3, r4)).invokeSuspend(Unit.INSTANCE);
+    }
+
+    @Override // kotlin.jvm.functions.Function2
+    public /* bridge */ /* synthetic */ Object invoke(PointerInputScope r2, Continuation<? super Unit> r3) {
+        return invoke2(r2, r3);
+    }
+
+    @Override // kotlin.coroutines.jvm.internal.BaseContinuationImpl
+    public final Object invokeSuspend(Object r2) {
+        IntrinsicsKt.getCOROUTINE_SUSPENDED();
+        switch(this.label) {
+            case 0: goto L6;
+            default: goto L5;
+        };
+    L6:
+        ResultKt.throwOnFailure(r2);
+        return Unit.INSTANCE;
+    L5:
+        throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+    }
+}

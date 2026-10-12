@@ -1,0 +1,3 @@
+rootProject.name = '603视界'
+
+include 'app'

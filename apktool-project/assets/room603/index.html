@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>603寝室 · AI导航</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0a0a1a;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+
+  #canvas-container {
+    position: fixed; inset: 0;
+  }
+
+  /* ====== 加载屏 ====== */
+  #loading {
+    position: fixed; inset: 0;
+    background: #0a0a1a;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+  }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #loading .load-num {
+    font-size: clamp(40px, 8vw, 80px);
+    font-weight: 900; color: #ffd700;
+    text-shadow: 3px 3px 0 #000, 0 0 30px rgba(255,215,0,0.5);
+    letter-spacing: 6px;
+  }
+  #loading .load-bar {
+    width: 200px; height: 8px;
+    background: #222; border: 2px solid #ffd700;
+    border-radius: 4px; margin-top: 20px;
+    overflow: hidden;
+  }
+  #loading .load-fill {
+    height: 100%; width: 0%;
+    background: #ffd700;
+    transition: width 0.3s ease;
+  }
+  #loading .load-text {
+    margin-top: 12px; font-size: 12px; color: #888;
+    letter-spacing: 2px;
+  }
+
+  /* ====== 顶部标题 ====== */
+  #title-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 50; text-align: center; padding: 14px 10px 8px;
+    pointer-events: none;
+  }
+  #title-bar .room-num {
+    display: inline-block;
+    font-size: clamp(24px, 4.5vw, 44px);
+    font-weight: 900; color: #ffd700;
+    text-shadow:
+      3px 3px 0 #000, -1px -1px 0 #000,
+      1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+      0 0 25px rgba(255,215,0,0.6);
+    letter-spacing: 5px;
+    transform: rotate(-2deg);
+  }
+  #title-bar .room-sub {
+    display: block; margin-top: 3px;
+    font-size: clamp(9px, 1.2vw, 13px);
+    color: rgba(255,255,255,0.5); letter-spacing: 8px;
+    font-weight: 700;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  /* ====== 底部提示条 ====== */
+  #hint-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 50;
+    background: linear-gradient(90deg,
+      rgba(10,10,26,0.95), rgba(30,30,60,0.9), rgba(10,10,26,0.95));
+    border-top: 2px solid #ffd700;
+    padding: 10px 16px;
+    text-align: center;
+    pointer-events: none;
+  }
+  #hint-bar span {
+    display: inline-block;
+    font-size: clamp(10px, 1.3vw, 14px);
+    color: #ffd700; font-weight: 700;
+    text-shadow: 1px 1px 0 #000;
+    letter-spacing: 1px;
+    transition: opacity 0.5s ease;
+  }
+
+  /* ====== 角色对话气泡（HTML覆盖层） ====== */
+  .char-label {
+    position: fixed;
+    z-index: 40;
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+    transition: opacity 0.4s ease;
+  }
+
+  /* 气泡主体 */
+  .char-label .bubble {
+    position: relative;
+    min-width: 70px;
+    max-width: 160px;
+    background: #fff;
+    border: 2.5px solid #1a1a1a;
+    border-radius: 12px;
+    padding: 6px 10px 5px;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.25);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    text-align: center;
+  }
+  .char-label .bubble.show { opacity: 1; }
+
+  /* 角色名字 */
+  .char-label .bubble .bname {
+    display: block;
+    font-size: 10px; font-weight: 900;
+    color: #888;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+
+  /* 对话文字 */
+  .char-label .bubble .btext {
+    display: block;
+    font-size: 12px; font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.4;
+  }
+
+  /* 气泡尾巴（指向角色） */
+  .char-label .bubble::before {
+    content: "";
+    position: absolute;
+    bottom: -10px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #1a1a1a;
+  }
+  .char-label .bubble::after {
+    content: "";
+    position: absolute;
+    bottom: -7px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #fff;
+  }
+
+  /* 悬停时名牌 */
+  .char-label .name-tag {
+    position: absolute; bottom: calc(100% + 4px); left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; font-weight: 900;
+    color: #fff;
+    background: rgba(0,0,0,0.8);
+    padding: 2px 8px; border-radius: 5px;
+    border: 2px solid #ffd700;
+    white-space: nowrap;
+    text-shadow: 1px 1px 0 #000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .char-label .name-tag.show { opacity: 1; }
+
+  /* ====== 操作提示 ====== */
+  #controls-hint {
+    position: fixed; bottom: 52px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 50; pointer-events: none;
+    font-size: 10px; color: rgba(255,255,255,0.35);
+    text-shadow: 1px 1px 0 #000;
+    letter-spacing: 1px;
+  }
+
+  /* ====== 写实灯开关 ====== */
+  #light-switch {
+    position: fixed; top: 16px; right: 16px;
+    z-index: 60;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s ease;
+  }
+  #light-switch:hover { transform: scale(1.05); }
+  #light-switch:active { transform: scale(0.96); }
+
+  /* 面板 */
+  .switch-plate {
+    width: 62px; height: 88px;
+    background: linear-gradient(145deg, #e8e0d0, #d0c8b8);
+    border-radius: 10px;
+    border: 1px solid #b8b0a0;
+    box-shadow:
+      0 2px 8px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.6),
+      inset 0 -1px 0 rgba(0,0,0,0.1);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative;
+    padding: 8px 0;
+  }
+
+  /* 螺丝 */
+  .switch-screw {
+    position: absolute;
+    width: 5px; height: 5px;
+    background: radial-gradient(circle at 30% 30%, #d0d0d0, #888);
+    border-radius: 50%;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,0.3);
+  }
+  .switch-screw::after {
+    content: ""; position: absolute;
+    top: 1px; left: 2px;
+    width: 1px; height: 3px;
+    background: #666;
+  }
+  .switch-screw.tl { top: 5px; left: 5px; }
+  .switch-screw.tr { top: 5px; right: 5px; }
+  .switch-screw.bl { bottom: 5px; left: 5px; }
+  .switch-screw.br { bottom: 5px; right: 5px; }
+
+  /* 开关槽 */
+  .switch-slot {
+    width: 28px; height: 56px;
+    background: linear-gradient(180deg, #a09888, #b0a898);
+    border-radius: 14px;
+    border: 1px solid #908878;
+    box-shadow:
+      inset 0 2px 4px rgba(0,0,0,0.3),
+      inset 0 -1px 0 rgba(255,255,255,0.2);
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* 开关拨杆 */
+  .switch-lever {
+    width: 24px; height: 26px;
+    background: linear-gradient(180deg, #f0ebe0, #d5cec0);
+    border-radius: 5px;
+    border: 1px solid #b0a898;
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.7);
+    position: absolute;
+    transition: top 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background 0.3s ease;
+    top: 27px; /* 关灯状态：拨杆在下方 */
+  }
+  #light-switch.on .switch-lever {
+    top: 3px; /* 开灯状态：拨杆在上方 */
+    background: linear-gradient(180deg, #fff8e8, #f0e8d0);
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.2),
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      0 0 8px rgba(255,215,0,0.4);
+  }
+
+  /* 拨杆上的凹槽 */
+  .switch-lever::before {
+    content: ""; position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px; height: 2px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 1px;
+  }
+
+  /* 指示灯 */
+  .switch-led {
+    position: absolute; bottom: 10px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #666;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+  }
+  #light-switch.on .switch-led {
+    background: #ffd700;
+    box-shadow:
+      0 0 6px rgba(255,215,0,0.6),
+      0 0 12px rgba(255,215,0,0.3),
+      inset 0 -1px 1px rgba(255,255,255,0.3);
+  }
+
+  /* ON / OFF 文字 */
+  .switch-label {
+    font-size: 6px; font-weight: 900;
+    color: #888; letter-spacing: 1px;
+    text-transform: uppercase;
+    position: absolute;
+  }
+  .switch-label.on-label { top: 6px; }
+  .switch-label.off-label { bottom: 18px; }
+  #light-switch.on .switch-label.on-label { color: #b8960a; }
+  #light-switch:not(.on) .switch-label.off-label { color: #555; }
+
+  /* ====== 移动端 ====== */
+  @media (max-width: 768px) {
+    #title-bar { padding: 10px 8px 6px; }
+    #title-bar .room-num { font-size: 22px; letter-spacing: 3px; }
+    #controls-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 加载屏 -->
+<div id="loading">
+  <div class="load-num">603</div>
+  <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
+  <div class="load-text">正在布置寝室…</div>
+</div>
+
+<!-- 顶部标题 -->
+<div id="title-bar">
+  <span class="room-num">603</span>
+  <span class="room-sub">A I  寝  室  导  航</span>
+</div>
+
+<!-- 操作提示 -->
+<div id="controls-hint">🖱️ 拖拽旋转 · 滚轮缩放 · 双击角色进入</div>
+
+<!-- 写实灯开关 -->
+<div id="light-switch" title="开灯">
+  <div class="switch-plate">
+    <div class="switch-screw tl"></div>
+    <div class="switch-screw tr"></div>
+    <div class="switch-screw bl"></div>
+    <div class="switch-screw br"></div>
+    <div class="switch-label on-label">ON</div>
+    <div class="switch-slot">
+      <div class="switch-lever"></div>
+    </div>
+    <div class="switch-label off-label">OFF</div>
+    <div class="switch-led"></div>
+  </div>
+</div>
+
+<!-- 底部提示 -->
+<div id="hint-bar">
+  <span>▶ 双击寝室里的AI角色，切换模型并进入对话 ◀</span>
+</div>
+
+<!-- 3D Canvas -->
+<div id="canvas-container"></div>
+
+<!-- 角色标签容器 -->
+<div id="labels-container"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./three.module.js",
+    "three/addons/": "./"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./OrbitControls.js";
+import { EffectComposer } from "./EffectComposer.js";
+import { RenderPass } from "./RenderPass.js";
+import { ShaderPass } from "./ShaderPass.js";
+import { OutputPass } from "./OutputPass.js";
+
+/* ================================================================
+ * 603寝室 · 3D导航
+ * Three.js 真3D宿舍场景，四个AI角色在寝室随机活动
+ * ================================================================ */
+
+// ---------- 全局状态 ----------
+let scene, camera, renderer, controls, composer;
+let raycaster, mouse;
+let characters = [];
+let dustParticles;
+let lampLight, ambientLight, dirLight, moonLight, monitorGlow1, monitorGlow2;
+let clock;
+let loadedCount = 0;
+const TOTAL_TEXTURES = 5;
+let isDayMode = false;
+let bathroomDoor = null; // 厕所门 pivot
+let deer = null;         // 厕所常驻的鹿鹿
+
+// 外卖系统
+const takeoutBrands = [
+  { name: "麦当劳",     emoji: "🍔", color: "#e5121e" },
+  { name: "塔斯汀",     emoji: "🍗", color: "#c4302b" },
+  { name: "霸碗盖码饭", emoji: "🍚", color: "#e08a1e" }
+];
+let takeouts = [];            // 当前在门口的外卖
+const MAX_TAKEOUTS = 2;       // 门口同时最多等待数
+let takeoutTimer = 0;
+let takeoutNext = 20;          // 下一次刷新间隔（秒），运行时随机化
+
+// 夜晚/白天参数（Source 引擎风格：暖色室内光 + 冷色天空光，柔和低对比）
+const NIGHT = { bg: 0x14181f, fog: 0x14181f, fogNear: 9, fogFar: 28, ambient: 0x3a4256, ambientI: 1.6, dir: 0x9fb8ff, dirI: 0.5, lamp: 0xffcf8a, lampI: 1.6, lampDist: 10, moonI: 0.35, monitorI: 0.5, dustColor: 0xffe6c0, dustOpacity: 0.4 };
+const DAY   = { bg: 0x9fb6c9, fog: 0xc4d6e2, fogNear: 12, fogFar: 40, ambient: 0xe9e4d6, ambientI: 2.6, dir: 0xffe2b8, dirI: 1.6, lamp: 0xfff0d8, lampI: 0.7, lampDist: 6, moonI: 0.0, monitorI: 0.15, dustColor: 0xffffff, dustOpacity: 0.28 };
+
+// 当前插值目标
+let lightTarget = { ...NIGHT };
+
+// ---------- 初始化 ----------
+function init() {
+  clock = new THREE.Clock();
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(NIGHT.bg);
+  scene.fog = new THREE.Fog(NIGHT.fog, NIGHT.fogNear, NIGHT.fogFar);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 50);
+  camera.position.set(0, 2.8, 7.5);
+
+  // Renderer —— Source 引擎风格：标准分辨率 + 抗锯齿 + 柔和阴影 + ACES 色调映射
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  document.getElementById("canvas-container").appendChild(renderer.domElement);
+  onResize();
+  // Android WebView 对离屏后期处理帧缓冲的兼容性不稳定，会出现 HTML 标签正常但 3D 画布黑屏。
+  // App 内直接渲染 Scene；普通浏览器继续保留原网页的 Source 风格后期处理。
+  if (!window.RoomBridge) buildComposer();
+
+  // Controls
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1.2, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.8;
+  controls.minDistance = 3;
+  controls.maxDistance = 14;
+  controls.maxPolarAngle = Math.PI * 0.52;
+  controls.minPolarAngle = Math.PI * 0.15;
+  controls.enablePan = false;
+
+  // 用户交互时停止自动旋转
+  controls.addEventListener("start", () => { controls.autoRotate = false; });
+
+  buildLighting();
+  buildRoom();
+  buildFurniture();
+  buildCharacters();
+  buildDeer();
+  buildParticles();
+  setupInteraction();
+
+  // （已移除 PS1 顶点抖动；Source 风格使用平滑渲染 + 后期调色）
+
+  // Resize
+  window.addEventListener("resize", onResize);
+
+  // 开灯按钮
+  document.getElementById("light-switch").addEventListener("click", toggleLight);
+
+  // Start
+  animate();
+}
+
+// ---------- 灯光 ----------
+function buildLighting() {
+  // 环境光（柔和填充）
+  ambientLight = new THREE.AmbientLight(NIGHT.ambient, NIGHT.ambientI);
+  scene.add(ambientLight);
+
+  // 主方向光（天空光 / 日光）—— 柔和软阴影
+  dirLight = new THREE.DirectionalLight(NIGHT.dir, NIGHT.dirI);
+  dirLight.position.set(5, 9, 5);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.left = -7;
+  dirLight.shadow.camera.right = 7;
+  dirLight.shadow.camera.top = 7;
+  dirLight.shadow.camera.bottom = -7;
+  dirLight.shadow.bias = -0.0008;
+  dirLight.shadow.radius = 4;
+  scene.add(dirLight);
+
+  // 吊灯光（暖色点光源，室内主光）
+  lampLight = new THREE.PointLight(NIGHT.lamp, NIGHT.lampI, NIGHT.lampDist);
+  lampLight.position.set(0, 3.2, 0);
+  lampLight.castShadow = true;
+  lampLight.shadow.mapSize.set(1024, 1024);
+  lampLight.shadow.bias = -0.0008;
+  scene.add(lampLight);
+
+  // 显示器微光
+  monitorGlow1 = new THREE.PointLight(0x4488ff, NIGHT.monitorI, 2);
+  monitorGlow1.position.set(-3, 1.2, 0);
+  scene.add(monitorGlow1);
+
+  monitorGlow2 = new THREE.PointLight(0x4488ff, NIGHT.monitorI, 2);
+  monitorGlow2.position.set(3, 1.2, 0);
+  scene.add(monitorGlow2);
+
+  // 窗外天光（日/夜柔光）
+  moonLight = new THREE.PointLight(NIGHT.dir, NIGHT.moonI, 6);
+  moonLight.position.set(0, 2, -3.5);
+  scene.add(moonLight);
+}
+
+// ---------- 灯光切换 ----------
+function toggleLight() {
+  isDayMode = !isDayMode;
+  lightTarget = isDayMode ? { ...DAY } : { ...NIGHT };
+  const btn = document.getElementById("light-switch");
+  btn.classList.toggle("on", isDayMode);
+  btn.title = isDayMode ? "关灯" : "开灯";
+}
+
+// 每帧插值过渡灯光
+function lerpLights(delta) {
+  const speed = 3 * delta;
+  const lerp = (a, b, t) => a + (b - a) * Math.min(t, 1);
+
+  // 背景色
+  const bgC = new THREE.Color(scene.background);
+  const bgT = new THREE.Color(lightTarget.bg);
+  bgC.lerp(bgT, speed);
+  scene.background = bgC;
+
+  // 雾
+  scene.fog.color.lerp(new THREE.Color(lightTarget.fog), speed);
+  scene.fog.near = lerp(scene.fog.near, lightTarget.fogNear, speed);
+  scene.fog.far = lerp(scene.fog.far, lightTarget.fogFar, speed);
+
+  // 环境光
+  ambientLight.color.lerp(new THREE.Color(lightTarget.ambient), speed);
+  ambientLight.intensity = lerp(ambientLight.intensity, lightTarget.ambientI, speed);
+
+  // 方向光
+  dirLight.color.lerp(new THREE.Color(lightTarget.dir), speed);
+  dirLight.intensity = lerp(dirLight.intensity, lightTarget.dirI, speed);
+
+  // 吊灯
+  lampLight.color.lerp(new THREE.Color(lightTarget.lamp), speed);
+  lampLight.intensity = lerp(lampLight.intensity, lightTarget.lampI, speed);
+  lampLight.distance = lerp(lampLight.distance, lightTarget.lampDist, speed);
+
+  // 月光
+  moonLight.intensity = lerp(moonLight.intensity, lightTarget.moonI, speed);
+
+  // 显示器
+  monitorGlow1.intensity = lerp(monitorGlow1.intensity, lightTarget.monitorI, speed);
+  monitorGlow2.intensity = lerp(monitorGlow2.intensity, lightTarget.monitorI, speed);
+
+  // 粒子
+  if (dustParticles) {
+    dustParticles.material.color.lerp(new THREE.Color(lightTarget.dustColor), speed);
+    dustParticles.material.opacity = lerp(dustParticles.material.opacity, lightTarget.dustOpacity, speed);
+  }
+}
+
+// ---------- 房间 ----------
+function buildRoom() {
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0x3d3d6e });
+  const floorMat = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
+  const ceilMat = new THREE.MeshLambertMaterial({ color: 0x2a2a4e });
+
+  // 地板
+  const floorGeo = new THREE.PlaneGeometry(8, 6);
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // 地板纹理（木板线）
+  const floorTex = new THREE.CanvasTexture(makeFloorCanvas());
+  floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+  floorTex.repeat.set(4, 3);
+  floorTex.magFilter = THREE.LinearFilter;
+  floorMat.map = floorTex;
+  floorMat.needsUpdate = true;
+
+  // 后墙
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3.5), wallMat);
+  backWall.position.set(0, 1.75, -3);
+  backWall.receiveShadow = true;
+  scene.add(backWall);
+
+  // 左墙
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.5), wallMat);
+  leftWall.position.set(-4, 1.75, 0);
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.receiveShadow = true;
+  scene.add(leftWall);
+
+  // 右墙
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.5), wallMat);
+  rightWall.position.set(4, 1.75, 0);
+  rightWall.rotation.y = -Math.PI / 2;
+  rightWall.receiveShadow = true;
+  scene.add(rightWall);
+
+  // 天花板
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), ceilMat);
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 3.5;
+  scene.add(ceil);
+
+  // 地毯
+  const rugGeo = new THREE.CircleGeometry(1.5, 32);
+  const rugMat = new THREE.MeshLambertMaterial({ color: 0x8b3030 });
+  const rug = new THREE.Mesh(rugGeo, rugMat);
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(0, 0.02, 0.5);
+  rug.receiveShadow = true;
+  scene.add(rug);
+
+  // 地毯花纹
+  const rugTex = new THREE.CanvasTexture(makeRugCanvas());
+  rugTex.magFilter = THREE.LinearFilter;
+  rugMat.map = rugTex;
+  rugMat.needsUpdate = true;
+}
+
+// ---------- 家具 ----------
+function buildFurniture() {
+  // 床1（左后）
+  buildBed(-2.5, -2);
+  // 床2（右后）
+  buildBed(2.5, -2);
+  // 书桌1（左）
+  buildDesk(-3.2, 0);
+  // 书桌2（右）
+  buildDesk(3.2, 0);
+  // 门
+  buildDoor();
+  // 厕所
+  buildBathroom();
+  // 窗户
+  buildWindow();
+  // 海报
+  buildPosters();
+  // 时钟
+  buildClockMesh();
+  // 书架
+  buildBookshelf();
+  // 植物
+  buildPlant();
+  // 吊灯
+  buildLamp();
+}
+
+function buildBed(x, z) {
+  const group = new THREE.Group();
+
+  // 床架
+  const frameMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 1.2), frameMat);
+  frame.position.y = 0.15;
+  frame.castShadow = true;
+  group.add(frame);
+
+  // 床腿
+  const legGeo = new THREE.BoxGeometry(0.08, 0.15, 0.08);
+  [[-0.85, -0.55], [-0.85, 0.55], [0.85, -0.55], [0.85, 0.55]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(legGeo, frameMat);
+    leg.position.set(lx, 0.075, lz);
+    group.add(leg);
+  });
+
+  // 床垫
+  const mattressMat = new THREE.MeshLambertMaterial({ color: 0x4169e1 });
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 1.1), mattressMat);
+  mattress.position.y = 0.27;
+  group.add(mattress);
+
+  // 枕头
+  const pillowMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.3), pillowMat);
+  pillow.position.set(-0.55, 0.35, 0);
+  group.add(pillow);
+
+  // 床头板
+  const headboard = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 1.2), frameMat);
+  headboard.position.set(-0.94, 0.5, 0);
+  group.add(headboard);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+}
+
+function buildDesk(x, z) {
+  const group = new THREE.Group();
+
+  // 桌面
+  const deskMat = new THREE.MeshLambertMaterial({ color: 0xd2691e });
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.8), deskMat);
+  top.position.y = 0.78;
+  top.castShadow = true;
+  group.add(top);
+
+  // 桌腿
+  const legMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const legGeo = new THREE.BoxGeometry(0.08, 0.78, 0.08);
+  [[-0.6, -0.3], [-0.6, 0.3], [0.6, -0.3], [0.6, 0.3]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.set(lx, 0.39, lz);
+    group.add(leg);
+  });
+
+  // 显示器
+  const monitorMat = new THREE.MeshLambertMaterial({ color: 0x1a1a2e });
+  const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.04), monitorMat);
+  monitor.position.set(0, 1.1, -0.15);
+  monitor.rotation.x = -0.1;
+  group.add(monitor);
+
+  // 屏幕
+  const screenMat = new THREE.MeshBasicMaterial({ color: 0x2266aa });
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.29), screenMat);
+  screen.position.set(0, 1.1, -0.128);
+  screen.rotation.x = -0.1;
+  group.add(screen);
+  group.userData.screenMat = screenMat;
+
+  // 显示器底座
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.15), monitorMat);
+  stand.position.set(0, 0.83, -0.15);
+  group.add(stand);
+
+  // 键盘
+  const kbMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  const kb = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.15), kbMat);
+  kb.position.set(0, 0.82, 0.1);
+  group.add(kb);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+function buildDoor() {
+  // 门框
+  const frameMat = new THREE.MeshLambertMaterial({ color: 0x6b4226 });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.2, 1.0), frameMat);
+  frame.position.set(-3.96, 1.1, 2);
+  scene.add(frame);
+
+  // 门板
+  const doorMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.0, 0.8), doorMat);
+  door.position.set(-3.95, 1.0, 2);
+  scene.add(door);
+
+  // 门牌 "603"
+  const signGeo = new THREE.PlaneGeometry(0.25, 0.12);
+  const signCanvas = document.createElement("canvas");
+  signCanvas.width = 32; signCanvas.height = 16;
+  const ctx = signCanvas.getContext("2d");
+  ctx.fillStyle = "#8b4513"; ctx.fillRect(0, 0, 32, 16);
+  ctx.fillStyle = "#ffd700"; ctx.font = "bold 10px monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("603", 16, 8);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  signTex.magFilter = THREE.LinearFilter;
+  const signMat = new THREE.MeshBasicMaterial({ map: signTex });
+  const sign = new THREE.Mesh(signGeo, signMat);
+  sign.position.set(-3.93, 1.8, 2);
+  sign.rotation.y = Math.PI / 2;
+  scene.add(sign);
+
+  // 门把手
+  const knobMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), knobMat);
+  knob.position.set(-3.92, 1.0, 2.3);
+  scene.add(knob);
+}
+
+// ---------- 厕所（可开合门 + 常驻鹿鹿）----------
+function buildBathroom() {
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0x4a4a6a });
+  const tileMat = new THREE.MeshLambertMaterial({ color: 0x356066 });
+  const whiteMat = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 });
+
+  // 厕所地板（瓷砖） x∈[2.9,3.9] z∈[1.55,2.95]
+  // 三面墙隔间：远墙(z=1.55) + 右墙(x=3.93) + 左墙(x=2.87，带门)
+  // 观察面（近墙 z=2.95）空出，正对相机敞开，能直接看到里面的鹿鹿
+  const bf = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.4), tileMat);
+  bf.rotation.x = -Math.PI / 2;
+  bf.position.set(3.4, 0.01, 2.25);
+  bf.receiveShadow = true;
+  scene.add(bf);
+
+  // 三面墙隔间：远墙 + 右墙 + 左墙（左墙带门洞）。观察面（近墙）敞开，无近墙
+  // 远墙 z=1.55（远离相机，正对敞开面）
+  const backW = new THREE.Mesh(new THREE.BoxGeometry(1.08, 2.2, 0.06), wallMat);
+  backW.position.set(3.4, 1.1, 1.55);
+  backW.receiveShadow = true;
+  scene.add(backW);
+
+  // 右墙 x=3.93（完整保留）
+  const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.2, 1.48), wallMat);
+  rightW.position.set(3.93, 1.1, 2.25);
+  rightW.receiveShadow = true;
+  scene.add(rightW);
+
+  // 左墙 x=2.87，开一个门洞（门洞 z∈[1.8,2.6]，门高 0~1.6）；门装在这面
+  // 门洞前段 z∈[1.55,1.8]
+  const leftFront = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.2, 0.25), wallMat);
+  leftFront.position.set(2.87, 1.1, 1.675);
+  leftFront.receiveShadow = true;
+  scene.add(leftFront);
+  // 门洞后段 z∈[2.6,2.95]
+  const leftBack = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.2, 0.35), wallMat);
+  leftBack.position.set(2.87, 1.1, 2.775);
+  leftBack.receiveShadow = true;
+  scene.add(leftBack);
+  // 门楣（门洞上方 y∈[1.6,2.2]）
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.6, 0.82), wallMat);
+  lintel.position.set(2.87, 1.9, 2.2);
+  lintel.receiveShadow = true;
+  scene.add(lintel);
+
+  // 马桶（靠近远墙 z=1.55）
+  const tank = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.4, 0.16), whiteMat);
+  tank.position.set(3.62, 0.5, 1.66);
+  scene.add(tank);
+  const bowl = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.36), whiteMat);
+  bowl.position.set(3.62, 0.24, 1.74);
+  scene.add(bowl);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.38), whiteMat);
+  seat.position.set(3.62, 0.4, 1.74);
+  scene.add(seat);
+
+  // 厕所门：装到左墙(x=2.87)门洞前缘(z=1.8)，朝厕所内部(+x)开合
+  const pivot = new THREE.Group();
+  pivot.position.set(2.87, 1.0, 1.8);
+  scene.add(pivot);
+
+  const doorMat = new THREE.MeshLambertMaterial({ color: 0x9b6b4a });
+  const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.0, 0.8), doorMat);
+  doorPanel.position.set(0, 0, 0.4); // 沿 +z 延伸，闭合时覆盖门洞 z[1.8,2.6]
+  doorPanel.castShadow = true;
+  pivot.add(doorPanel);
+
+  // 门把手（朝寝室侧 -x）
+  const knobMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), knobMat);
+  knob.position.set(-0.03, 0, 0.72);
+  pivot.add(knob);
+
+  // WC 牌（贴在门朝寝室的面，即 -x 面）
+  const wcCanvas = document.createElement("canvas");
+  wcCanvas.width = 32; wcCanvas.height = 16;
+  const ctx = wcCanvas.getContext("2d");
+  ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0, 0, 32, 16);
+  ctx.fillStyle = "#ffd700"; ctx.font = "bold 10px monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("WC", 16, 8);
+  const wcTex = new THREE.CanvasTexture(wcCanvas);
+  wcTex.magFilter = THREE.LinearFilter;
+  const wcMat = new THREE.MeshBasicMaterial({ map: wcTex });
+  const wc = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.11), wcMat);
+  wc.position.set(-0.03, 0.1, 0.4);
+  wc.rotation.y = -Math.PI / 2; // 法线朝 -x（朝寝室）
+  pivot.add(wc);
+
+  bathroomDoor = { pivot, open: false, targetRot: 0, currentRot: 0 };
+
+  // 厕所内微光
+  const wcLight = new THREE.PointLight(0x88ccbb, 0.3, 2.4);
+  wcLight.position.set(3.4, 1.6, 2.3);
+  scene.add(wcLight);
+}
+
+// 设定厕所门开合状态（true=开，false=关）
+function setBathroomDoor(openState) {
+  if (!bathroomDoor) return;
+  bathroomDoor.open = openState;
+  bathroomDoor.targetRot = openState ? Math.PI / 2 : 0;
+
+  // 鹿鹿反应：开门探头到门口，关门缩回中间
+  if (deer) {
+    if (openState) {
+      deer.targetX = 2.98; // 探头到左墙门口
+      deer.labelBtextEl.textContent = "鹿？";
+      deer.labelBubbleEl.classList.add("show");
+      clearTimeout(deer._bubbleTimer);
+      deer._bubbleTimer = setTimeout(() => deer.labelBubbleEl.classList.remove("show"), 2600);
+    } else {
+      deer.targetX = 3.4; // 缩回中间
+    }
+  }
+}
+
+// 常驻厕所的鹿鹿
+function buildDeer() {
+  const loader = new THREE.TextureLoader();
+  loader.load("lulu.png", (texture) => {
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({
+      map: texture, transparent: true, alphaTest: 0.1, toneMapped: false, fog: false
+    });
+    retrofyMaterial(mat);
+    const sprite = new THREE.Sprite(mat);
+    const size = 0.62;
+    sprite.scale.set(size, size, 1);
+    const baseY = size / 2;
+    sprite.position.set(3.4, baseY, 2.3);
+    scene.add(sprite);
+
+    deer = {
+      id: "deer",
+      name: "鹿鹿",
+      desc: "厕所常驻 · 像素鹿",
+      link: "lulu_index.html",
+      sprite,
+      size,
+      baseY,
+      bobPhase: Math.random() * Math.PI * 2,
+      targetX: 3.4,
+      labelEl: null, labelNameEl: null, labelBubbleEl: null, labelBtextEl: null
+    };
+    createCharLabel(deer);
+    // 鹿鹿名牌不再常显，改为悬停才出现（去掉头顶常驻黄框）
+
+    onTextureLoaded();
+  }, undefined, () => onTextureLoaded());
+}
+
+// ---------- 外卖（大门口随机刷新，室友随机取）----------
+function makeTakeoutTexture(brand) {
+  const c = document.createElement("canvas");
+  c.width = 48; c.height = 48;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = brand.color;
+  ctx.fillRect(0, 0, 48, 48);
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, 44, 44);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(brand.name, 24, 24);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+
+function spawnTakeout() {
+  const waiting = takeouts.filter(t => !t.picked);
+  if (waiting.length >= MAX_TAKEOUTS) return;
+  const brand = takeoutBrands[Math.floor(Math.random() * takeoutBrands.length)];
+
+  const mat = new THREE.SpriteMaterial({
+    map: makeTakeoutTexture(brand),
+    transparent: true, alphaTest: 0.1, toneMapped: false, fog: false
+  });
+  retrofyMaterial(mat);
+  const size = 0.5;
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(size, size, 1);
+
+  // 门口排队：在门内依次排列（x 越小越靠门）
+  const idx = waiting.length;
+  const x = -3.55 - idx * 0.32;
+  const z = 2.0;
+  const baseY = size / 2;
+  sprite.position.set(x, baseY, z);
+  scene.add(sprite);
+
+  const item = {
+    name: "外卖", desc: brand.name,
+    brand, sprite, size, baseY,
+    picked: false,
+    spawnT: clock.elapsedTime,
+    bobPhase: Math.random() * Math.PI * 2,
+    labelEl: null, labelNameEl: null, labelBubbleEl: null, labelBtextEl: null
+  };
+  createCharLabel(item);
+  item.labelBtextEl.textContent = "外卖到！" + brand.emoji;
+  item.labelBubbleEl.classList.add("show");
+  clearTimeout(item._bubbleTimer);
+  item._bubbleTimer = setTimeout(() => item.labelBubbleEl.classList.remove("show"), 4000);
+
+  takeouts.push(item);
+
+  // 派一名空闲室友去门口取
+  notifyRoommate();
+}
+
+function notifyRoommate() {
+  const candidates = characters.filter(c => c.state === "idle");
+  if (candidates.length === 0) return;
+  const c = candidates[Math.floor(Math.random() * candidates.length)];
+  c._gotoDoor = true;
+}
+
+function pickupTakeout() {
+  const waiting = takeouts.filter(t => !t.picked);
+  if (waiting.length === 0) return null;
+  const item = waiting[0];
+  item.picked = true;
+  scene.remove(item.sprite);
+  if (item.labelEl && item.labelEl.parentNode) {
+    item.labelEl.parentNode.removeChild(item.labelEl);
+  }
+  takeouts = takeouts.filter(t => t !== item);
+  return item.brand;
+}
+
+function buildWindow() {
+  // 窗框
+  const frameMat = new THREE.MeshLambertMaterial({ color: 0x4a3d6b });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 0.08), frameMat);
+  frame.position.set(0, 1.8, -2.96);
+  scene.add(frame);
+
+  // 窗玻璃（夜晚天空）
+  const glassCanvas = document.createElement("canvas");
+  glassCanvas.width = 64; glassCanvas.height = 64;
+  const ctx = glassCanvas.getContext("2d");
+  // 夜空渐变
+  const grad = ctx.createLinearGradient(0, 0, 0, 64);
+  grad.addColorStop(0, "#0a0a2e");
+  grad.addColorStop(0.5, "#1a1a5e");
+  grad.addColorStop(1, "#2a2a6e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  // 星星
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < 10; i++) {
+    ctx.fillRect(Math.random() * 64, Math.random() * 64, 1, 1);
+  }
+  // 月亮
+  ctx.fillStyle = "#ffeaa7";
+  ctx.beginPath(); ctx.arc(45, 15, 6, 0, Math.PI * 2); ctx.fill();
+  const glassTex = new THREE.CanvasTexture(glassCanvas);
+  glassTex.magFilter = THREE.LinearFilter;
+  const glassMat = new THREE.MeshBasicMaterial({ map: glassTex });
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.0), glassMat);
+  glass.position.set(0, 1.8, -2.92);
+  scene.add(glass);
+
+  // 窗格十字
+  const crossMat = new THREE.MeshLambertMaterial({ color: 0x4a3d6b });
+  const crossH = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.02), crossMat);
+  crossH.position.set(0, 1.8, -2.91);
+  scene.add(crossH);
+  const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.0, 0.02), crossMat);
+  crossV.position.set(0, 1.8, -2.91);
+  scene.add(crossV);
+}
+
+function buildPosters() {
+  const posterData = [
+    { x: -1.8, text: "RM", color: "#e74c3c", rot: -0.05 },
+    { x: 0.5, text: "LINUX", color: "#2ecc71", rot: 0.03 },
+    { x: 2.2, text: "DESK\nPARK", color: "#f39c12", rot: -0.02 }
+  ];
+
+  posterData.forEach(p => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 32; canvas.height = 40;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = p.color;
+    ctx.fillRect(0, 0, 32, 40);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    p.text.split("\n").forEach((line, i) => {
+      ctx.fillText(line, 16, 18 + i * 10);
+    });
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.65), mat);
+    mesh.position.set(p.x, 2.2, -2.95);
+    mesh.rotation.z = p.rot;
+    scene.add(mesh);
+  });
+}
+
+function buildClockMesh() {
+  // 时钟
+  const clockCanvas = document.createElement("canvas");
+  clockCanvas.width = 32; clockCanvas.height = 32;
+  const ctx = clockCanvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(16, 16, 15, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(16, 16, 15, 0, Math.PI * 2); ctx.stroke();
+  // 刻度
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const x1 = 16 + Math.cos(angle) * 12;
+    const y1 = 16 + Math.sin(angle) * 12;
+    const x2 = 16 + Math.cos(angle) * 14;
+    const y2 = 16 + Math.sin(angle) * 14;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  // 指针
+  ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(16, 16); ctx.lineTo(16, 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(16, 16); ctx.lineTo(22, 16); ctx.stroke();
+  const tex = new THREE.CanvasTexture(clockCanvas);
+  const mat = new THREE.MeshBasicMaterial({ map: tex });
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.25, 32), mat);
+  mesh.position.set(3.5, 2.4, -2.95);
+  scene.add(mesh);
+}
+
+function buildBookshelf() {
+  const shelfMat = new THREE.MeshLambertMaterial({ color: 0x6b4226 });
+  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.8), shelfMat);
+  shelf.position.set(-3.85, 0.6, -1);
+  shelf.castShadow = true;
+  scene.add(shelf);
+
+  // 书
+  const bookColors = [0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
+  for (let i = 0; i < 6; i++) {
+    const bookMat = new THREE.MeshLambertMaterial({ color: bookColors[i] });
+    const book = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.15, 0.12),
+      bookMat
+    );
+    book.position.set(-3.68, 0.25 + i * 0.18, -0.8 + (i % 2) * 0.2);
+    scene.add(book);
+  }
+}
+
+function buildPlant() {
+  // 花盆
+  const potMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.2, 8), potMat);
+  pot.position.set(3.3, 0.1, -1.5);
+  pot.castShadow = true;
+  scene.add(pot);
+
+  // 植物
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x27ae60 });
+  for (let i = 0; i < 5; i++) {
+    const leaf = new THREE.Mesh(
+      new THREE.ConeGeometry(0.05, 0.3, 4),
+      leafMat
+    );
+    const angle = (i / 5) * Math.PI * 2;
+    leaf.position.set(
+      3.3 + Math.cos(angle) * 0.06,
+      0.35,
+      -1.5 + Math.sin(angle) * 0.06
+    );
+    leaf.rotation.z = Math.cos(angle) * 0.3;
+    leaf.rotation.x = Math.sin(angle) * 0.3;
+    scene.add(leaf);
+  }
+}
+
+function buildLamp() {
+  // 灯线
+  const cordMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4, 4), cordMat);
+  cord.position.set(0, 3.3, 0);
+  scene.add(cord);
+
+  // 灯罩
+  const shadeMat = new THREE.MeshLambertMaterial({ color: 0xf1c40f });
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.2, 8, 1, true), shadeMat);
+  shade.position.set(0, 3.05, 0);
+  scene.add(shade);
+}
+
+// ---------- 角色 ----------
+function buildCharacters() {
+  const charDefs = [
+    {
+      id: "kunkun", name: "困困", desc: "汇元AI · 佛系水豚",
+      img: "capybara.png", link: "index.html",
+      spots: ["bed1", "desk1", "window", "floor2", "center", "bed2", "bathroom", "door"],
+      size: 0.85
+    },
+    {
+      id: "guigui", name: "龟龟", desc: "龟龟AI · 卷毛小青龟",
+      img: "guigui.png", link: "guigui_index.html",
+      spots: ["bed2", "desk2", "floor1", "floor3", "desk1", "center", "bathroom", "door"],
+      size: 0.75
+    },
+    {
+      id: "piaoai", name: "朴AI", desc: "朴AI · 卷毛花衬衫企鹅",
+      img: "piaoai.png", link: "piaoai_index.html",
+      spots: ["desk1", "door", "floor3", "desk2", "bed1", "floor1", "bathroom"],
+      size: 0.85
+    },
+    {
+      id: "tango", name: "探戈", desc: "Tango AI · 胖狗熊",
+      img: "tango.png", link: "tango_index.html",
+      spots: ["bed1", "desk2", "bed2", "floor2", "desk1", "center", "bathroom", "door"],
+      size: 0.9
+    }
+  ];
+
+  // 3D 活动点（groundY = 角色脚底站立的表面高度）
+  const spotPositions = {
+    bed1:   { x: -2.5, groundY: 0.33, z: -2,   anim: "sleep",  text: "困了，先眯一会儿…" },
+    bed2:   { x: 2.5,  groundY: 0.33, z: -2,   anim: "sleep",  text: "呼噜噜…Zzz" },
+    desk1:  { x: -3.2, groundY: 0.81, z: 0.3,  anim: "bounce", text: "在写代码呢！" },
+    desk2:  { x: 3.2,  groundY: 0.81, z: 0.3,  anim: "bounce", text: "搞机中，勿扰" },
+    floor1: { x: -1.2, groundY: 0,    z: 1.2,  anim: "wobble", text: "溜达溜达~" },
+    floor2: { x: 0,    groundY: 0,    z: 1.5,  anim: "wobble", text: "在寝室散步" },
+    floor3: { x: 1.2,  groundY: 0,    z: 1.2,  anim: "wobble", text: "走走走，出去吃饭？" },
+    window: { x: 0,    groundY: 0,    z: -2.3, anim: "peek",   text: "看月亮…" },
+    door:   { x: -3.2, groundY: 0,    z: 2.0,  anim: "rock",   text: "要出门了！" },
+    bathroom: { x: 2.45, groundY: 0,  z: 2.2,  anim: "wobble", text: "上厕所~🚪" },  // 厕所门口（寝室侧，正对门洞）
+    center: { x: 0,    groundY: 0,    z: 0.3,  anim: "bounce", text: "发呆中" }
+  };
+
+  const initialAssign = ["bed1", "desk1", "floor3", "bed2"];
+
+  charDefs.forEach((def, idx) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(def.img, (texture) => {
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+
+      const mat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        alphaTest: 0.1,
+        toneMapped: false,
+        fog: false
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(def.size, def.size, 1);
+
+      const char = {
+        ...def,
+        sprite,
+        currentSpot: initialAssign[idx],
+        targetPos: new THREE.Vector3(),
+        currentPos: new THREE.Vector3(),
+        moveSpeed: 1.5 + Math.random() * 0.5,
+        bobPhase: Math.random() * Math.PI * 2,
+        state: "idle", // idle, moving, jumping
+        stateTimer: 0,
+        idleDuration: 4000 + Math.random() * 6000,
+        labelEl: null,
+        labelNameEl: null,
+        labelBubbleEl: null,
+        labelBtextEl: null,
+        baseY: 0
+      };
+
+      // 初始位置（groundY + 半高 = Sprite 中心）
+      const initSpot = spotPositions[initialAssign[idx]];
+      const halfH = def.size / 2;
+      char.currentPos.set(initSpot.x, initSpot.groundY + halfH, initSpot.z);
+      char.targetPos.copy(char.currentPos);
+      char.baseY = initSpot.groundY + halfH;
+      sprite.position.copy(char.currentPos);
+      char.state = "idle";
+
+      scene.add(sprite);
+      characters.push(char);
+
+      // 创建标签（必须在 push 之后）
+      createCharLabel(char);
+
+      // 初始气泡
+      char.labelBtextEl.textContent = initSpot.text;
+      char.labelBubbleEl.classList.add("show");
+      char._bubbleTimer = setTimeout(() => {
+        char.labelBubbleEl.classList.remove("show");
+      }, 4000);
+
+      onTextureLoaded();
+    }, undefined, (err) => {
+      // 纹理加载失败也计数，避免卡死
+      console.warn("纹理加载失败:", def.img, err);
+      onTextureLoaded();
+    });
+  });
+
+  // 将 spotPositions 暴露给外部使用
+  window._spotPositions = spotPositions;
+}
+
+// ---------- 粒子（灰尘） ----------
+function buildParticles() {
+  const count = 80;
+  const positions = new Float32Array(count * 3);
+  const velocities = [];
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 7;
+    positions[i * 3 + 1] = Math.random() * 3;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 5;
+    velocities.push({
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: 0.001 + Math.random() * 0.002,
+      vz: (Math.random() - 0.5) * 0.002
+    });
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: 0xffeecc,
+    size: 0.015,
+    transparent: true,
+    opacity: 0.5,
+    sizeAttenuation: true
+  });
+
+  dustParticles = new THREE.Points(geo, mat);
+  dustParticles.userData.velocities = velocities;
+  scene.add(dustParticles);
+}
+
+// ---------- 标签 ----------
+function createCharLabel(char) {
+  const container = document.getElementById("labels-container");
+  const label = document.createElement("div");
+  label.className = "char-label";
+  label.id = "label-" + char.id;
+
+  const nameTag = document.createElement("div");
+  nameTag.className = "name-tag";
+  nameTag.textContent = char.name + " · " + char.desc;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = '<span class="bname">' + char.name + '</span><span class="btext"></span>';
+
+  label.appendChild(nameTag);
+  label.appendChild(bubble);
+  container.appendChild(label);
+
+  char.labelEl = label;
+  char.labelNameEl = nameTag;
+  char.labelBubbleEl = bubble;
+  char.labelBtextEl = bubble.querySelector(".btext");
+}
+
+// ---------- 交互 ----------
+function setupInteraction() {
+  const canvas = renderer.domElement;
+  let pointerStart = null;
+  let lastTapCharId = null;
+  let lastTapAt = 0;
+  let confirmationTimer = null;
+
+  function findCharacterAt(clientX, clientY) {
+    const x = (clientX / innerWidth) * 2 - 1;
+    const y = -(clientY / innerHeight) * 2 + 1;
+    mouse.set(x, y);
+    raycaster.setFromCamera(mouse, camera);
+
+    const sprites = characters.map(c => c.sprite);
+    if (deer) sprites.push(deer.sprite);
+    const intersects = raycaster.intersectObjects(sprites);
+    if (intersects.length === 0) return null;
+
+    const hitSprite = intersects[0].object;
+    return characters.find(c => c.sprite === hitSprite)
+      || (deer && deer.sprite === hitSprite ? deer : null);
+  }
+
+  canvas.addEventListener("pointerdown", function(e) {
+    if (!e.isPrimary) return;
+    pointerStart = { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() };
+  });
+
+  canvas.addEventListener("pointerup", function(e) {
+    if (!e.isPrimary || !pointerStart || pointerStart.id !== e.pointerId) return;
+    const start = pointerStart;
+    pointerStart = null;
+    const distance = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    const duration = performance.now() - start.at;
+
+    // 拖动旋转、长按和滑动不算点击，避免移动场景时误进入。
+    if (distance > 18 || duration > 450) return;
+    const char = findCharacterAt(e.clientX, e.clientY);
+    if (!char) return;
+
+    if (char.id === "deer") {
+      char.labelBtextEl.textContent = "鹿鹿只是路过～";
+      char.labelBubbleEl.classList.add("show");
+      clearTimeout(char._bubbleTimer);
+      char._bubbleTimer = setTimeout(() => char.labelBubbleEl.classList.remove("show"), 1300);
+      return;
+    }
+
+    const now = performance.now();
+    if (lastTapCharId === char.id && now - lastTapAt <= 520) {
+      lastTapCharId = null;
+      lastTapAt = 0;
+      clearTimeout(confirmationTimer);
+      handleCharClick(char);
+    } else {
+      lastTapCharId = char.id;
+      lastTapAt = now;
+      char.labelBtextEl.textContent = "再点一次进入 " + char.name;
+      char.labelBubbleEl.classList.add("show");
+      clearTimeout(confirmationTimer);
+      confirmationTimer = setTimeout(() => {
+        lastTapCharId = null;
+        lastTapAt = 0;
+        char.labelBubbleEl.classList.remove("show");
+      }, 700);
+    }
+  });
+
+  canvas.addEventListener("pointercancel", function() {
+    pointerStart = null;
+  });
+
+  // 悬停检测
+  let hoveredChar = null;
+  canvas.addEventListener("mousemove", function(e) {
+    const x = (e.clientX / innerWidth) * 2 - 1;
+    const y = -(e.clientY / innerHeight) * 2 + 1;
+    mouse.set(x, y);
+    raycaster.setFromCamera(mouse, camera);
+
+    const sprites = characters.map(c => c.sprite);
+    if (deer) sprites.push(deer.sprite);
+    const intersects = raycaster.intersectObjects(sprites);
+
+    if (intersects.length > 0) {
+      const hitSprite = intersects[0].object;
+      let char = characters.find(c => c.sprite === hitSprite);
+      if (!char && deer && deer.sprite === hitSprite) char = deer;
+      if (char !== hoveredChar) {
+        if (hoveredChar) hoveredChar.labelNameEl.classList.remove("show");
+        hoveredChar = char;
+        if (hoveredChar) hoveredChar.labelNameEl.classList.add("show");
+        canvas.style.cursor = "pointer";
+      }
+    } else {
+      if (hoveredChar) {
+        hoveredChar.labelNameEl.classList.remove("show");
+        hoveredChar = null;
+      }
+      canvas.style.cursor = "default";
+    }
+  });
+}
+
+function handleCharClick(char) {
+  // 跳跃动画
+  char.state = "jumping";
+  char.stateTimer = 0;
+
+  // 显示气泡
+  char.labelBtextEl.textContent = ">>> 跳转中…";
+  char.labelBubbleEl.classList.add("show");
+
+  // 延迟跳转
+  setTimeout(() => {
+    if (window.RoomBridge && typeof window.RoomBridge.openModel === "function") {
+      window.RoomBridge.openModel(char.id);
+    } else {
+      window.location.href = char.link;
+    }
+  }, 600);
+}
+
+// ---------- 角色活动逻辑 ----------
+function updateCharacter(char, delta) {
+  const spots = window._spotPositions;
+  char.stateTimer += delta * 1000;
+
+  switch (char.state) {
+    case "idle": {
+      // 空闲动画
+      const spot = spots[char.currentSpot];
+      const anim = spot.anim;
+      const t = clock.elapsedTime * 2 + char.bobPhase;
+
+      switch (anim) {
+        case "bounce":
+          char.sprite.position.y = char.baseY + Math.sin(t) * 0.03;
+          break;
+        case "wobble":
+          char.sprite.material.rotation = Math.sin(t * 0.8) * 0.1;
+          char.sprite.position.y = char.baseY + Math.sin(t * 0.5) * 0.02;
+          break;
+        case "sleep":
+          char.sprite.scale.y = char.size * (0.9 + Math.sin(t * 0.5) * 0.05);
+          char.sprite.position.y = char.baseY + Math.sin(t * 0.3) * 0.01;
+          break;
+        case "peek":
+          char.sprite.position.y = char.baseY + Math.sin(t) * 0.05;
+          char.sprite.material.rotation = Math.sin(t * 0.5) * 0.05;
+          break;
+        case "rock":
+          char.sprite.material.rotation = Math.sin(t * 0.6) * 0.15;
+          char.sprite.position.y = char.baseY + Math.abs(Math.sin(t * 0.6)) * 0.03;
+          break;
+      }
+
+      // 计时到，切换活动
+      if (char.stateTimer > char.idleDuration) {
+        char.state = "moving";
+        char.stateTimer = 0;
+        char.labelBubbleEl.classList.remove("show");
+
+        // 选择新位置（门口有外卖则优先派去取）
+        let next;
+        const doorBusy = characters.some(c => c !== char && c.currentSpot === "door" && c.state !== "moving");
+        if (char._gotoDoor && char.spots.includes("door") && !doorBusy) {
+          next = "door";
+          char._gotoDoor = false;
+        } else {
+          const available = char.spots.filter(s => {
+            // 排除其他角色当前占用的点
+            return !characters.some(c => c !== char && c.currentSpot === s && c.state !== "moving");
+          });
+          const pool = available.length > 0 ? available : char.spots;
+          const filtered = pool.filter(s => s !== char.currentSpot);
+          next = filtered.length > 0
+            ? filtered[Math.floor(Math.random() * filtered.length)]
+            : char.currentSpot;
+        }
+
+        char.currentSpot = next;
+        const newSpot = spots[next];
+        const newBaseY = newSpot.groundY + char.size / 2;
+        char.targetPos.set(newSpot.x, newBaseY, newSpot.z);
+        char.baseY = newBaseY;
+
+        // 新气泡（移动到位后才显示）
+        char.labelBtextEl.textContent = newSpot.text;
+
+        // 重置变换
+        char.sprite.material.rotation = 0;
+        char.sprite.scale.set(char.size, char.size, 1);
+      }
+      break;
+    }
+
+    case "moving": {
+      // 向目标移动
+      const dist = char.currentPos.distanceTo(char.targetPos);
+      if (dist > 0.05) {
+        const dir = new THREE.Vector3().subVectors(char.targetPos, char.currentPos).normalize();
+        const step = Math.min(char.moveSpeed * delta, dist);
+        char.currentPos.addScaledVector(dir, step);
+        char.sprite.position.copy(char.currentPos);
+
+        // 移动时的走路弹跳
+        char.sprite.position.y += Math.abs(Math.sin(clock.elapsedTime * 8)) * 0.05;
+      } else {
+        // 到达
+        char.currentPos.copy(char.targetPos);
+        char.sprite.position.copy(char.targetPos);
+        char.state = "idle";
+        char.stateTimer = 0;
+        char.sprite.material.rotation = 0;
+        char.sprite.scale.set(char.size, char.size, 1);
+
+        // 到达后显示气泡
+        char.labelBubbleEl.classList.add("show");
+        // 3秒后自动隐藏
+        clearTimeout(char._bubbleTimer);
+        char._bubbleTimer = setTimeout(() => {
+          char.labelBubbleEl.classList.remove("show");
+        }, 3000);
+
+        // 到达厕所门口 → 先开门，短暂停留后关门（完整「开关」动作）
+        if (char.currentSpot === "bathroom") {
+          setBathroomDoor(true);          // 开门
+          char.labelBtextEl.textContent = "开门！🚽";
+          // 1.3s 后关门
+          clearTimeout(char._doorTimer);
+          char._doorTimer = setTimeout(() => {
+            setBathroomDoor(false);       // 关门
+            char.labelBtextEl.textContent = "关门~";
+            clearTimeout(char._bubbleTimer);
+            char._bubbleTimer = setTimeout(() => {
+              char.labelBubbleEl.classList.remove("show");
+            }, 1500);
+          }, 1300);
+          char.idleDuration = 2600 + Math.random() * 1500; // 门口多停留一会儿
+        } else if (char.currentSpot === "door") {
+          const brand = pickupTakeout();
+          if (brand) {
+            char.labelBtextEl.textContent = "取外卖~ " + brand.emoji + brand.name;
+            char.idleDuration = 2500 + Math.random() * 1500;
+          } else {
+            char.labelBtextEl.textContent = "要出门了！";
+            char.idleDuration = 3000 + Math.random() * 3000;
+          }
+        } else {
+          char.idleDuration = 4000 + Math.random() * 6000;
+        }
+      }
+      break;
+    }
+
+    case "jumping": {
+      // 跳跃动画
+      const jumpT = char.stateTimer / 600;
+      if (jumpT < 1) {
+        const jumpHeight = Math.sin(jumpT * Math.PI) * 0.4;
+        char.sprite.position.y = char.baseY + jumpHeight;
+        const s = char.size * (1 + Math.sin(jumpT * Math.PI) * 0.2);
+        char.sprite.scale.set(s, s, 1);
+      } else {
+        char.state = "idle";
+        char.stateTimer = 0;
+        char.sprite.position.y = char.baseY;
+        char.sprite.scale.set(char.size, char.size, 1);
+      }
+      break;
+    }
+  }
+}
+
+// ---------- 标签位置更新 ----------
+function updateLabels() {
+  const all = characters.concat(takeouts);
+  if (deer) all.push(deer);
+  all.forEach(char => {
+    if (!char.labelEl) return;
+
+    // 将 3D 位置投影到屏幕，气泡放在角色头顶上方
+    const pos = char.sprite.position.clone();
+    pos.y += char.size * 0.6 + 0.25; // 头顶上方
+    pos.project(camera);
+
+    const x = (pos.x * 0.5 + 0.5) * innerWidth;
+    const y = (-pos.y * 0.5 + 0.5) * innerHeight;
+
+    char.labelEl.style.left = x + "px";
+    char.labelEl.style.top = y + "px";
+
+    // 如果角色在屏幕外或被遮挡，隐藏标签
+    if (pos.z > 1 || pos.x < -1 || pos.x > 1 || pos.y < -1 || pos.y > 1) {
+      char.labelEl.style.opacity = "0";
+    } else {
+      char.labelEl.style.opacity = "1";
+    }
+  });
+}
+
+// ---------- 粒子更新 ----------
+function updateParticles() {
+  if (!dustParticles) return;
+  const positions = dustParticles.geometry.attributes.position.array;
+  const velocities = dustParticles.userData.velocities;
+
+  for (let i = 0; i < velocities.length; i++) {
+    const v = velocities[i];
+    positions[i * 3] += v.vx;
+    positions[i * 3 + 1] += v.vy;
+    positions[i * 3 + 2] += v.vz;
+
+    // 超出范围则重置
+    if (positions[i * 3 + 1] > 3.5) {
+      positions[i * 3 + 1] = 0;
+      positions[i * 3] = (Math.random() - 0.5) * 7;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 5;
+    }
+  }
+
+  dustParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// ---------- 显示器闪烁 ----------
+function updateMonitors() {
+  const t = clock.elapsedTime;
+  // 简单闪烁效果
+  const flicker = 0.7 + Math.sin(t * 2) * 0.3;
+  // 遍历场景找到屏幕材质
+  scene.traverse(obj => {
+    if (obj.material && obj.material.color && obj.userData.isScreen) {
+      obj.material.color.setScalar(flicker * 0.5 + 0.5);
+    }
+  });
+}
+
+// ---------- Canvas 纹理生成 ----------
+function makeFloorCanvas() {
+  const c = document.createElement("canvas");
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext("2d");
+  // 木纹色
+  ctx.fillStyle = "#5a4a3a";
+  ctx.fillRect(0, 0, 32, 32);
+  // 木板缝
+  ctx.fillStyle = "#4a3d30";
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(0, i * 8, 32, 1);
+  }
+  // 木纹
+  ctx.fillStyle = "#5d4e3e";
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(0, i * 8 + 1, 32, 6);
+  }
+  return c;
+}
+
+function makeRugCanvas() {
+  const c = document.createElement("canvas");
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext("2d");
+  // 同心圆花纹
+  const colors = ["#c0392b", "#e74c3c", "#c0392b", "#a93226", "#8b3030"];
+  for (let i = 5; i > 0; i--) {
+    ctx.fillStyle = colors[5 - i];
+    ctx.beginPath();
+    ctx.arc(16, 16, i * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return c;
+}
+
+// ---------- 加载进度 ----------
+function onTextureLoaded() {
+  loadedCount++;
+  const pct = Math.round((loadedCount / TOTAL_TEXTURES) * 100);
+  const fill = document.getElementById("loadFill");
+  if (fill) fill.style.width = pct + "%";
+
+  if (loadedCount >= TOTAL_TEXTURES) {
+    setTimeout(() => {
+      const loading = document.getElementById("loading");
+      if (loading) loading.classList.add("done");
+    }, 300);
+  }
+}
+
+// 加载超时兜底：5秒后强制隐藏加载屏
+setTimeout(() => {
+  const loading = document.getElementById("loading");
+  if (loading && !loading.classList.contains("done")) {
+    loading.classList.add("done");
+  }
+}, 5000);
+
+// ---------- 窗口大小 ----------
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  if (composer) composer.setSize(w, h);
+  // 标准渲染，无像素化放大
+  const el = renderer.domElement;
+  // Android WebView 嵌入 Compose 时 100vh 可能被错误计算成 0px。
+  // 使用实际视口尺寸，确保 WebGL 画布拥有可见布局高度。
+  el.style.width = w + "px";
+  el.style.height = h + "px";
+  el.style.position = "absolute";
+  el.style.top = "0";
+  el.style.left = "0";
+}
+
+// ---------- Source 引擎风格后期调色 ----------
+// 去饱和 + 暖色暗部提升，模拟 Source（Half-Life 2 / CS:Source / TF2）柔和的 Orange Box 观感
+const SourceGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    sat:   { value: 0.85 },
+    lift:  { value: new THREE.Vector3(0.025, 0.018, 0.012) },
+    gamma: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+    gain:  { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+    exposure: { value: 1.0 }
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse;
+    uniform float sat;
+    uniform vec3 lift;
+    uniform vec3 gamma;
+    uniform vec3 gain;
+    uniform float exposure;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb * exposure;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(vec3(l), c, sat);
+      c = c * gain + lift;
+      c = pow(max(c, 0.0), gamma);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`
+};
+
+function buildComposer() {
+  composer = new EffectComposer(renderer);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new ShaderPass(SourceGradeShader));
+  composer.addPass(new OutputPass());
+}
+
+// 兼容性占位：旧 PS1 顶点抖动逻辑已废弃，保留空壳避免其它调用报错
+function retrofyMaterial(mat) { /* Source 风格不再做顶点抖动 */ }
+
+// ---------- 底部独白轮播 ----------
+const monologues = [
+  "困困：认知升级，佛系通关~",
+  "龟龟：嘿嘿，贴贴！卷毛龟在线营业~",
+  "朴AI：朴一朴，这破代码老子早玩明白了",
+  "探戈：饿了…吃什么？Zzz…",
+  "603寝室：今天也是元气满满的一天！",
+  "困困：让困困想想哦~",
+  "龟龟：要不要看看本龟的龟缸？",
+  "朴AI：热河路是一种精神状态",
+  "探戈：在Linux下这都不叫事"
+];
+let monoIdx = 0;
+setInterval(() => {
+  monoIdx = (monoIdx + 1) % monologues.length;
+  const el = document.querySelector("#hint-bar span");
+  if (el) {
+    el.style.opacity = "0";
+    setTimeout(() => {
+      el.textContent = "▶ 双击角色进入 · " + monologues[monoIdx] + " ◀";
+      el.style.opacity = "1";
+    }, 400);
+  }
+}, 5000);
+
+// ---------- 动画循环 ----------
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+
+  // 更新角色
+  characters.forEach(char => updateCharacter(char, delta));
+
+  // 更新外卖（门口排队轻微浮动 + 随机刷新 + 超时消失）
+  takeouts.forEach(t => {
+    t.sprite.position.y = t.baseY + Math.sin(clock.elapsedTime * 2 + t.bobPhase) * 0.03;
+  });
+  takeoutTimer += delta;
+  if (takeoutTimer >= takeoutNext) {
+    takeoutTimer = 0;
+    takeoutNext = 18 + Math.random() * 18; // 18~36 秒随机间隔，避免太频繁
+    spawnTakeout();
+  }
+  for (let i = takeouts.length - 1; i >= 0; i--) {
+    const t = takeouts[i];
+    if (clock.elapsedTime - t.spawnT > 45) {
+      scene.remove(t.sprite);
+      if (t.labelEl && t.labelEl.parentNode) t.labelEl.parentNode.removeChild(t.labelEl);
+      takeouts.splice(i, 1);
+    }
+  }
+
+  // 更新厕所门开合动画
+  if (bathroomDoor) {
+    const dSpeed = Math.min(1, delta * 4);
+    bathroomDoor.currentRot += (bathroomDoor.targetRot - bathroomDoor.currentRot) * dSpeed;
+    bathroomDoor.pivot.rotation.y = bathroomDoor.currentRot;
+  }
+
+  // 更新鹿鹿（厕所常驻，门口探头 / 缩回，沿 x 轴移动）
+  if (deer) {
+    const t = clock.elapsedTime;
+    const tx = deer.targetX !== undefined ? deer.targetX : 3.4;
+    deer.sprite.position.x += (tx - deer.sprite.position.x) * Math.min(1, delta * 3);
+    if (deer.state === "jumping") {
+      // 点击跳转前的小跳跃（与室友一致）
+      deer.stateTimer += delta * 1000;
+      const jt = Math.min(1, deer.stateTimer / 600);
+      const jumpH = Math.sin(jt * Math.PI) * 0.4;
+      deer.sprite.position.y = deer.baseY + jumpH;
+      const s = deer.size * (1 + Math.sin(jt * Math.PI) * 0.2);
+      deer.sprite.scale.set(s, s, 1);
+    } else {
+      deer.sprite.position.y = deer.baseY + Math.sin(t * 2 + deer.bobPhase) * 0.03;
+    }
+  }
+
+  // 更新粒子
+  updateParticles();
+
+  // 更新标签
+  updateLabels();
+
+  // 吊灯微微摆动 + 灯光插值
+  lerpLights(delta);
+
+  controls.update();
+  if (composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+
+// ---------- 启动 ----------
+try {
+  init();
+} catch (error) {
+  console.error("603 init failed", error);
+}
+
+</script>
+</body>
+</html>

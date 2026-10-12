@@ -1,0 +1,43 @@
+package androidx.compose.foundation.layout;
+
+import androidx.compose.ui.Alignment;
+import androidx.compose.ui.Modifier;
+import androidx.compose.ui.layout.HorizontalAlignmentLine;
+import androidx.compose.ui.layout.Measured;
+import kotlin.Metadata;
+import kotlin.jvm.functions.Function1;
+
+/* JADX INFO: compiled from: Row.kt */
+/* JADX INFO: loaded from: classes.dex */
+@LayoutScopeMarker
+@Metadata(d1 = {"\u0000:\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0010\b\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u0007\n\u0000\n\u0002\u0010\u000b\n\u0000\bg\u0018\u00002\u00020\u0001J\u0014\u0010\u0002\u001a\u00020\u0003*\u00020\u00032\u0006\u0010\u0004\u001a\u00020\u0005H'J \u0010\u0006\u001a\u00020\u0003*\u00020\u00032\u0012\u0010\u0007\u001a\u000e\u0012\u0004\u0012\u00020\t\u0012\u0004\u0012\u00020\n0\bH'J\u0014\u0010\u0006\u001a\u00020\u0003*\u00020\u00032\u0006\u0010\u000b\u001a\u00020\fH'J\f\u0010\r\u001a\u00020\u0003*\u00020\u0003H'J \u0010\u000e\u001a\u00020\u0003*\u00020\u00032\b\b\u0001\u0010\u000e\u001a\u00020\u000f2\b\b\u0002\u0010\u0010\u001a\u00020\u0011H'ø\u0001\u0000\u0082\u0002\u0006\n\u0004\b!0\u0001¨\u0006\u0012À\u0006\u0003"}, d2 = {"Landroidx/compose/foundation/layout/RowScope;", "", "align", "Landroidx/compose/ui/Modifier;", "alignment", "Landroidx/compose/ui/Alignment$Vertical;", "alignBy", "alignmentLineBlock", "Lkotlin/Function1;", "Landroidx/compose/ui/layout/Measured;", "", "alignmentLine", "Landroidx/compose/ui/layout/HorizontalAlignmentLine;", "alignByBaseline", "weight", "", "fill", "", "foundation-layout_release"}, k = 1, mv = {1, 9, 0}, xi = 48)
+public interface RowScope {
+
+    /* JADX INFO: compiled from: Row.kt */
+    @Metadata(k = 3, mv = {1, 9, 0}, xi = 48)
+    public static final class DefaultImpls {
+        public static /* synthetic */ Modifier weight$default(RowScope r0, Modifier r1, float r2, boolean r3, int r4, Object r5) {
+            return RowScope.weight$default(r0, r1, r2, r3, r4, r5);
+        }
+    }
+
+    Modifier align(Modifier r1, Alignment.Vertical r2);
+
+    Modifier alignBy(Modifier r1, HorizontalAlignmentLine r2);
+
+    Modifier alignBy(Modifier r1, Function1<? super Measured, Integer> r2);
+
+    Modifier alignByBaseline(Modifier r1);
+
+    Modifier weight(Modifier r1, float r2, boolean r3);
+
+    static /* synthetic */ Modifier weight$default(RowScope r0, Modifier r1, float r2, boolean r3, int r4, Object r5) {
+        if (r5 != null) goto L9;
+        if ((r4 & 2) == 0) goto L7;
+        r3 = true;
+    L7:
+        return r0.weight(r1, r2, r3);
+    L9:
+        throw new UnsupportedOperationException("Super calls with default arguments not supported in this target, function: weight");
+    }
+}
